@@ -1,2 +1,2 @@
 Flask
-folium==0.14.0
+folium
