@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SchoolTalent's Tutor Map</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        h2 {
+            text-align:center;
+            margin-top: 5px;
+        }
+        fieldset {
+            margin-bottom: 20px;          /* Center fieldset with auto margins */
+            border: 1px solid #ccc;     /* Border for the fieldset */
+            padding: 10px;              /* Padding inside the fieldset */
+            max-width: 3000px;           /* Optional: max width for larger screens */
+        }
+        .inline-dropdowns {
+          display: flex;               /* Use flexbox for layout */
+          flex-wrap: wrap;            /* Allow wrapping of dropdowns */
+          gap: 20px;                  /* Spacing between dropdowns */
+          justify-content: center;     /* Center items in the flex container */
+        }
+        .dropdown-container {
+          display: flex;               /* Flex for label and dropdown alignment */
+          flex-direction: column;      /* Stack label above dropdown */
+          align-items: center;         /* Center items */
+        }
+        label {
+          margin-bottom: 5px;         /* Space between label and dropdown */
+          font-weight: bold;           /* Make label bold */
+        }
+        select {
+          width: 160px;               /* Width for dropdowns */
+          height: 325px;
+          min-width: 100px;           /* Minimum width */
+        }
+        .submit-button {
+          margin-left: 20px;          /* Space between dropdowns and button */
+          align-self: center;          /* Align button to the center */
+          margin-top: 10px;           /* Space above the button */
+          display: inline-block;       /* Ensures the button respects margin */
+        }
+        .map-container {
+            width: 80%;             /* Set the width of the map container */
+            height: 600px;          /* Set the height of the map container */
+            margin: 15px auto;      /* Center the map container */
+            border: 5px solid #04e; /* Optional: Add border to map container */
+            overflow: hidden;       /* Prevent overflow from the container */
+            position: relative;      /* Position relative for child absolute positioning */
+        }
+        #map {
+            width: 100%;            /* Full width of the map container */
+            height: 100%;           /* Full height of the map container */
+            position: absolute;      /* Position absolute to fill the container */
+            top: 0;                 /* Align to the top */
+            left: 0;                /* Align to the left */
+        }
+        table.data {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table.data th, table.data td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        table.data th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1 style = "font-size: 35px">SchoolTalent's Tutor Map (Visualization)</h1>
+    <h2 style = 'margin-bottom: 7px'> Khanh Chu <i>© 2024 SchoolTalent</i></h2>
+
+    <form method="POST" style="text-align: center; margin-top: 7px; margin-bottom: 20px;">
+        <label for="country">Select Country:</label>
+        <select id="country" name="country" required style = 'height: 20px'>
+            <option value="">--Select a country--</option>
+            {% for country in countries %}
+                <option value="{{ country }}" {% if country == selected_country %}selected{% endif %}>{{ country }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Apply Country</button>
+    </form>
+
+    {% if selected_country %}
+    <form method="POST">
+        <input type="hidden" name="country" value="{{ selected_country }}">
+        <fieldset>
+            <legend style = 'font-size:15px; align:center'> Ctrl + Click to choose/unchoose. The option should be filled (either with grey or blue) when clicking 'Apply Filter'</legend>
+            <div class="inline-dropdowns">
+                <div class="dropdown-container">
+                    <label for="school_level">School Levels:</label>
+                    <select id="school_level" name="school_level" multiple>
+                        {% for level in school_levels %}
+                            <option value="{{ level }}" {% if level in selected_school_levels %}selected{% endif %}>{{ level }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-container">
+                    <label for="school_year">School Years:</label>
+                    <select id="school_year" name="school_year" multiple>
+                        {% for year in school_years %}
+                            <option value="{{ year }}" {% if year in selected_school_years %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-container">
+                    <label for="school_type">School Types:</label>
+                    <select id="school_type" name="school_type" multiple>
+                        {% for type in school_types %}
+                            <option value="{{ type }}" {% if type in selected_school_types %}selected{% endif %}>{{ type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="dropdown-container">
+                    <label for="course_name">Courses:</label>
+                    <select id="course_name" name="course_name" multiple>
+                        {% for course in course_names %}
+                            <option value="{{ course }}" {% if course in selected_course_names %}selected{% endif %}>{{ course }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="dropdown-container">
+                    <label for="availability">Tutor Availability:</label>
+                    <select id="availability" name="availability" multiple>
+                        {% for avail in availability %}
+                            <option value="{{ avail }}" {% if avail in selected_availabilities %}selected{% endif %}>{{ avail }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <!-- Submit button placed within the filters box -->
+                <button type="submit" class="submit-button">Apply Filters</button>
+            </div>
+        </fieldset>
+    </form>
+    {% endif %}
+
+    {% if df_html %}
+    <!-- Map Container -->
+    <h1> Map visualization</h1>
+    <div class="map-container">
+        <div id="map">
+            {{ map_html|safe }}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- DataFrame display -->
+    {% if df_html %}
+    <h1> Tutor Information <i>(Filtered Data)</i> </h1>
+    <div id="dataframe">
+        {{ df_html|safe }}  <!-- Render the DataFrame HTML -->
+    </div>
+    {% endif %}
+</body>
+</html>
