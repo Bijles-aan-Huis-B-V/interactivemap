@@ -55,7 +55,7 @@ def index():
             selected_school_types = request.form.getlist('school_type')    
             selected_course_names = request.form.getlist('course_name')
             selected_availabilities = request.form.getlist('availability')
-            selected_availabilities = [bool(avail.lower()) for avail in selected_availabilities]
+            selected_availabilities = [avail.lower() == 'true' for avail in selected_availabilities]
             
             
             # Apply additional filters based on user selections
