@@ -44,9 +44,17 @@ def index():
 
             # Extract unique values for dropdowns, replacing NaN with '-Empty-'
             school_levels = final_df['school_level'].fillna('-Empty-').unique().tolist()
+            school_levels = sorted(school_levels, key=lambda x: (x == '-Empty-', x))
+            
             school_years = final_df['school_year'].fillna('-Empty-').unique().tolist()
+            school_years = sorted(x for x in school_years if isinstance(x, float)) + [x for x in school_years if isinstance(x, str)]
+            
             school_types = final_df['school_type'].fillna('-Empty-').unique().tolist()
+            school_types = sorted(school_types, key=lambda x: (x == '-Empty-', x))
+            
             course_names = final_df['course_name'].fillna('-Empty-').unique().tolist()
+            course_names = sorted(course_names, key=lambda x: (x == '-Empty-', x))
+            
             availability = final_df['availability'].fillna('-Empty-').unique().tolist()
 
             # Handle the second form submission for additional filters
@@ -101,7 +109,7 @@ def index():
                 for index, row in Tutor_filtered.iterrows():
                     folium.Circle(
                         location=(row['latitude'], row['longitude']),
-                        radius=row['max_travel_distance'],
+                        radius=row['max_travel_distance'] * 1000,
                         popup=f"Tutor: {row['tutor']}",
                         color="blue",
                     ).add_to(tutors_map)
@@ -117,15 +125,6 @@ def index():
                 map_html = "<p>No tutors available for the selected filters.</p>"
                 
             df_html = Tutor_filtered.to_html(classes='data', index=False, escape=False)
-
-    # After processing POST request, repopulate filter options
-    if selected_country:
-        final_df = Courses[Courses['country'] == selected_country]
-        school_levels = final_df['school_level'].fillna('-Empty-').unique().tolist()
-        school_years = final_df['school_year'].fillna('-Empty-').unique().tolist()
-        school_types = final_df['school_type'].fillna('-Empty-').unique().tolist()
-        course_names = final_df['course_name'].fillna('-Empty-').unique().tolist()
-        availability = final_df['availability'].fillna('-Empty-').unique().tolist()
 
     return render_template('template.html', 
                            countries=countries, 
