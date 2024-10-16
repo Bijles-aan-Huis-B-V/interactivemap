@@ -26,12 +26,12 @@ Tutor = pd.read_csv('Tutor.csv')
 def index():
     # Initialize variables
     filtered_df = Courses.copy()
-    final_df = pd.DataFrame()
+    temp_df = pd.DataFrame()
     countries = Courses['country'].unique().tolist()
     school_levels = school_years = school_types = course_names = availability = []
     map_html = None
     selected_country = None
-    selected_school_levels = selected_school_years = selected_school_types = selected_course_names = selected_availabilities = []
+    selected_school_levels = selected_school_years = selected_school_types = selected_course_names = selected_availabilities = lessons_per_relation = no_lesson_tutor = []
     df_html = None
 
     if request.method == 'POST':
@@ -40,65 +40,93 @@ def index():
 
         # Filter data by the selected country only if one is selected
         if selected_country:
-            final_df = filtered_df[filtered_df['country'] == selected_country]
+            filtered_df = filtered_df[filtered_df['country'] == selected_country]
 
             # Extract unique values for dropdowns, replacing NaN with '-Empty-'
-            school_levels = final_df['school_level'].fillna('-Empty-').unique().tolist()
+            school_levels = filtered_df['school_level'].fillna('-Empty-').unique().tolist()
             school_levels = sorted(school_levels, key=lambda x: (x == '-Empty-', x))
             
-            school_years = final_df['school_year'].fillna('-Empty-').unique().tolist()
+            school_years = filtered_df['school_year'].fillna('-Empty-').unique().tolist()
             school_years = sorted(x for x in school_years if isinstance(x, float)) + [x for x in school_years if isinstance(x, str)]
             
-            school_types = final_df['school_type'].fillna('-Empty-').unique().tolist()
+            school_types = filtered_df['school_type'].fillna('-Empty-').unique().tolist()
             school_types = sorted(school_types, key=lambda x: (x == '-Empty-', x))
             
-            course_names = final_df['course_name'].fillna('-Empty-').unique().tolist()
+            course_names = filtered_df['course_name'].fillna('-Empty-').unique().tolist()
             course_names = sorted(course_names, key=lambda x: (x == '-Empty-', x))
             
-            availability = final_df['availability'].fillna('-Empty-').unique().tolist()
+            availability = filtered_df['availability'].fillna('-Empty-').unique().tolist()
 
             # Handle the second form submission for additional filters
             selected_school_levels = request.form.getlist('school_level')  
+            
             selected_school_years = request.form.getlist('school_year')
             selected_school_years = convert_float_list_to_int(selected_school_years)
-            selected_school_types = request.form.getlist('school_type')    
+            
+            selected_school_types = request.form.getlist('school_type')
+            
             selected_course_names = request.form.getlist('course_name')
+            
             selected_availabilities = request.form.getlist('availability')
             selected_availabilities = [avail.lower() == 'true' for avail in selected_availabilities]
+            
+            lessons_per_relation = request.form.get('lessons_per_relation')
+            
+            if lessons_per_relation:
+              try:
+                lessons_per_relation = float(lessons_per_relation)
+              except ValueError:
+                lessons_per_relation = None 
+            else:
+                lessons_per_relation = 0
+            
+            no_lesson_tutor = request.form.get('no_lesson_tutor')
             
             # Apply additional filters based on user selections
             if selected_school_levels:
                 if '-Empty-' in selected_school_levels:
-                    final_df = final_df[final_df['school_level'].isnull() | final_df['school_level'].isin(selected_school_levels)]
+                    filtered_df = filtered_df[filtered_df['school_level'].isnull() | filtered_df['school_level'].isin(selected_school_levels)]
                 else:
-                    final_df = final_df[final_df['school_level'].isin(selected_school_levels)]
+                    filtered_df = filtered_df[filtered_df['school_level'].isin(selected_school_levels)]
 
             if selected_school_years:
                 if '-Empty-' in selected_school_years:
-                    final_df = final_df[final_df['school_year'].isnull() | final_df['school_year'].isin(selected_school_years)]
+                    filtered_df = filtered_df[filtered_df['school_year'].isnull() | filtered_df['school_year'].isin(selected_school_years)]
                 else:
-                    final_df = final_df[final_df['school_year'].isin(selected_school_years)]
+                    filtered_df = filtered_df[filtered_df['school_year'].isin(selected_school_years)]
 
             if selected_school_types:
                 if '-Empty-' in selected_school_types:
-                    final_df = final_df[final_df['school_type'].isnull() | final_df['school_type'].isin(selected_school_types)]
+                    filtered_df = filtered_df[filtered_df['school_type'].isnull() | filtered_df['school_type'].isin(selected_school_types)]
                 else:
-                    final_df = final_df[final_df['school_type'].isin(selected_school_types)]
+                    filtered_df = filtered_df[filtered_df['school_type'].isin(selected_school_types)]
 
             if selected_course_names:
                 if '-Empty-' in selected_course_names:
-                    final_df = final_df[final_df['course_name'].isnull() | final_df['course_name'].isin(selected_course_names)]
+                    filtered_df = filtered_df[filtered_df['course_name'].isnull() | filtered_df['course_name'].isin(selected_course_names)]
                 else:
-                    final_df = final_df[final_df['course_name'].isin(selected_course_names)]
+                    filtered_df = filtered_df[filtered_df['course_name'].isin(selected_course_names)]
                     
             if selected_availabilities:
                 if '-Empty-' in selected_availabilities:
-                    final_df = final_df[final_df['availability'].isnull() | final_df['availability'].isin(selected_availabilities)]
+                    filtered_df = filtered_df[filtered_df['availability'].isnull() | filtered_df['availability'].isin(selected_availabilities)]
                 else:
-                    final_df = final_df[final_df['availability'].isin(selected_availabilities)]
+                    filtered_df = filtered_df[filtered_df['availability'].isin(selected_availabilities)]
+            
+            temp_df = Tutor[['tutor', 'lessons_per_relation']]
+            filtered_df = pd.merge(filtered_df, temp_df, how = 'left', on = 'tutor')
+                    
+            if no_lesson_tutor:
+                temp_df = filtered_df['lessons_per_relation'].fillna(0)
+                if lessons_per_relation is not None:
+                  filtered_df = temp_df[temp_df['lessons_per_relation'] >= lessons_per_relation]
+            else:
+                if lessons_per_relation is not None:
+                  temp_df = filtered_df[pd.notna(filtered_df['lessons_per_relation'])]
+                  filtered_df = temp_df[temp_df['lessons_per_relation'] >= lessons_per_relation]
             
             # Filter tutors based on the final filtered courses
-            tutor_numbers = final_df['tutor']
+            tutor_numbers = filtered_df['tutor']
             Tutor_filtered = Tutor[Tutor['tutor'].isin(tutor_numbers)]
 
             # Step 3: Create the map with filtered tutors
@@ -110,13 +138,13 @@ def index():
                     folium.Circle(
                         location=(row['latitude'], row['longitude']),
                         radius=row['max_travel_distance'] * 1000,
-                        popup=f"Tutor: {row['tutor']}",
+                        popup=f"Tutor: {row['tutor']}<br>Lessons per relation: {row['lessons_per_relation']}",
                         color="blue",
                     ).add_to(tutors_map)
                     
                     folium.Marker(
                       location=(row['latitude'], row['longitude']),
-                      popup=f"Tutor: {row['tutor']}",
+                      popup=f"Tutor: {row['tutor']}<br>Lessons per relation: {row['lessons_per_relation']}",
                       icon=folium.Icon(color='red', icon='info-sign'),  
                     ).add_to(tutors_map)
 
@@ -139,6 +167,8 @@ def index():
                            selected_school_types=selected_school_types,
                            selected_course_names=selected_course_names,
                            selected_availabilities=selected_availabilities,
+                           lessons_per_relation = lessons_per_relation,
+                           no_lesson_tutor = no_lesson_tutor,
                            map_html=map_html,
                            df_html=df_html)
 

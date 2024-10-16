@@ -41,7 +41,7 @@
         }
         select {
           width: 160px;               /* Width for dropdowns */
-          height: 325px;
+          height: 125px;
           min-width: 100px;           /* Minimum width */
         }
         .submit-button {
@@ -145,6 +145,19 @@
                         {% endfor %}
                     </select>
                 </div>
+                
+                <div class="dropdown-container">
+                  <label for="lessons_per_relation">Min accepted lessons per relation:</label>
+                  <input id="lessons_per_relation" name="lessons_per_relation" type="number" step="any" placeholder="Enter a float value (e.g., 4.5)">
+                </div>
+                
+                <div class="dropdown-container">
+                  <label for="no_lesson_tutor">Tutors with no relations?</label>
+                  <select id="no_lesson_tutor" name="no_lesson_tutor" multiple>
+                  <option value="Yes" {% if "Yes" in selected_availabilities %}selected{% endif %}>Yes</option>
+                  </select>
+                </div>
+
                 
                 <!-- Submit button placed within the filters box -->
                 <button type="submit" class="submit-button">Apply Filters</button>
