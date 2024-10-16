@@ -152,6 +152,7 @@ def index():
             else:
                 map_html = "<p>No tutors available for the selected filters.</p>"
                 
+            Tutor_filtered = Tutor_filtered[['tutor','created_at', 'state', 'country', 'city', 'max_travel_distance', 'lessons_per_relation']]
             df_html = Tutor_filtered.to_html(classes='data', index=False, escape=False)
 
     return render_template('template.html', 
