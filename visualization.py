@@ -17,10 +17,27 @@ def convert_float_list_to_int(float_list):
             # If there's a conversion error, skip this item
             continue
     return int_list
+  
+def categorize(value):
+    if value < 5.0:
+        return 'blue'
+    elif 5.0 <= value <= q25:
+        return 'red'
+    elif value >= q75:
+        return 'green'
+    else:
+        return 'yellow'
 
 # Load the datasets
 Courses = pd.read_csv('Courses.csv')
 Tutor = pd.read_csv('Tutor.csv')
+
+#Calculate relations percentile
+Quantiles = Tutor[Tutor['lessons_per_relation'] >= 5.0]
+q25 = Quantiles['lessons_per_relation'].quantile(0.25)
+q75 = Quantiles['lessons_per_relation'].quantile(0.75)
+
+Tutor['quantile_labels'] = Tutor['lessons_per_relation'].apply(categorize)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -28,10 +45,10 @@ def index():
     filtered_df = Courses.copy()
     temp_df = pd.DataFrame()
     countries = Courses['country'].unique().tolist()
-    school_levels = school_years = school_types = course_names = availability = []
+    school_levels = school_years = school_types = course_names = availability = tutor_types = []
     map_html = None
     selected_country = None
-    selected_school_levels = selected_school_years = selected_school_types = selected_course_names = selected_availabilities = lessons_per_relation = no_lesson_tutor = []
+    selected_school_levels = selected_school_years = selected_school_types = selected_course_names = selected_availabilities = lessons_per_relation = no_lesson_tutor = selected_tutor_types = []
     df_html = None
 
     if request.method == 'POST':
@@ -42,7 +59,7 @@ def index():
         if selected_country:
             filtered_df = filtered_df[filtered_df['country'] == selected_country]
 
-            # Extract unique values for dropdowns, replacing NaN with '-Empty-'
+        # Extract unique values for dropdowns, replacing NaN with '-Empty-'
             school_levels = filtered_df['school_level'].fillna('-Empty-').unique().tolist()
             school_levels = sorted(school_levels, key=lambda x: (x == '-Empty-', x))
             
@@ -56,8 +73,12 @@ def index():
             course_names = sorted(course_names, key=lambda x: (x == '-Empty-', x))
             
             availability = filtered_df['availability'].fillna('-Empty-').unique().tolist()
-
-            # Handle the second form submission for additional filters
+            
+            tutor_types = filtered_df['tutor_category'].fillna('-Empty-').unique().tolist()
+            tutor_types = sorted(x for x in tutor_types if isinstance(x, float)) + [x for x in tutor_types if isinstance(x, str)]
+            
+            
+        # Handle the second form submission for additional filters
             selected_school_levels = request.form.getlist('school_level')  
             
             selected_school_years = request.form.getlist('school_year')
@@ -72,6 +93,11 @@ def index():
             
             lessons_per_relation = request.form.get('lessons_per_relation')
             
+            selected_tutor_types = request.form.getlist('tutor_types')
+            selected_tutor_types = convert_float_list_to_int(selected_tutor_types)
+            
+            no_lesson_tutor = request.form.get('no_lesson_tutor')
+            
             if lessons_per_relation:
               try:
                 lessons_per_relation = float(lessons_per_relation)
@@ -80,9 +106,7 @@ def index():
             else:
                 lessons_per_relation = 0
             
-            no_lesson_tutor = request.form.get('no_lesson_tutor')
-            
-            # Apply additional filters based on user selections
+      # Apply additional filters based on user selections
             if selected_school_levels:
                 if '-Empty-' in selected_school_levels:
                     filtered_df = filtered_df[filtered_df['school_level'].isnull() | filtered_df['school_level'].isin(selected_school_levels)]
@@ -112,8 +136,14 @@ def index():
                     filtered_df = filtered_df[filtered_df['availability'].isnull() | filtered_df['availability'].isin(selected_availabilities)]
                 else:
                     filtered_df = filtered_df[filtered_df['availability'].isin(selected_availabilities)]
+              
+            if selected_tutor_types:
+                if '-Empty-' in selected_tutor_types:
+                    filtered_df = filtered_df[filtered_df['tutor_category'].isnull() | filtered_df['tutor_category'].isin(selected_tutor_types)]
+                else:
+                    filtered_df = filtered_df[filtered_df['tutor_category'].isin(selected_tutor_types)]
             
-            temp_df = Tutor[['tutor', 'lessons_per_relation']]
+            temp_df = Tutor[['tutor', 'number_of_relations', 'lessons_per_relation']]
             filtered_df = pd.merge(filtered_df, temp_df, how = 'left', on = 'tutor')
                     
             if no_lesson_tutor:
@@ -125,11 +155,13 @@ def index():
                   temp_df = filtered_df[pd.notna(filtered_df['lessons_per_relation'])]
                   filtered_df = temp_df[temp_df['lessons_per_relation'] >= lessons_per_relation]
             
-            # Filter tutors based on the final filtered courses
+      # Filter tutors based on the final filters
             tutor_numbers = filtered_df['tutor']
             Tutor_filtered = Tutor[Tutor['tutor'].isin(tutor_numbers)]
+            category = filtered_df[['tutor', 'tutor_category']].drop_duplicates()
+            Tutor_filtered = pd.merge(Tutor_filtered, category, how = 'left', on = 'tutor')
 
-            # Step 3: Create the map with filtered tutors
+      # Create the map with filtered tutors
             if not Tutor_filtered.empty:
                 map_center = [Tutor_filtered['latitude'].mean(), Tutor_filtered['longitude'].mean()]
                 tutors_map = folium.Map(location=map_center, zoom_start=7)
@@ -138,13 +170,13 @@ def index():
                     folium.Circle(
                         location=(row['latitude'], row['longitude']),
                         radius=row['max_travel_distance'] * 1000,
-                        popup=f"Tutor: {row['tutor']}<br>Lessons per relation: {row['lessons_per_relation']}",
-                        color="blue",
+                        popup=f"Tutor: {row['tutor']} <br><br> Tutor type: {row['tutor_category']} <br><br> Per relation: {row['lessons_per_relation']} lesson(s)",
+                        color=row['quantile_labels'],
                     ).add_to(tutors_map)
                     
                     folium.Marker(
                       location=(row['latitude'], row['longitude']),
-                      popup=f"Tutor: {row['tutor']}<br>Lessons per relation: {row['lessons_per_relation']}",
+                      popup=f"Tutor: {row['tutor']} <br><br> Tutor type: {row['tutor_category']} <br><br> Per relation: {row['lessons_per_relation']} lesson(s)",
                       icon=folium.Icon(color='red', icon='info-sign'),  
                     ).add_to(tutors_map)
 
@@ -152,7 +184,7 @@ def index():
             else:
                 map_html = "<p>No tutors available for the selected filters.</p>"
                 
-            Tutor_filtered = Tutor_filtered[['tutor','created_at', 'state', 'country', 'city', 'max_travel_distance', 'lessons_per_relation']]
+            Tutor_filtered = Tutor_filtered[['tutor','created_at', 'state', 'country', 'city', 'tutor_category', 'max_travel_distance', 'number_of_relations', 'lessons_per_relation']]
             Tutor_filtered['created_at'] = Tutor_filtered['created_at'].str[:10]
             df_html = Tutor_filtered.to_html(classes='data', index=False, escape=False)
 
@@ -171,6 +203,8 @@ def index():
                            selected_availabilities=selected_availabilities,
                            lessons_per_relation = lessons_per_relation,
                            no_lesson_tutor = no_lesson_tutor,
+                           tutor_types = tutor_types,
+                           selected_tutor_types = selected_tutor_types,
                            map_html=map_html,
                            df_html=df_html)
 

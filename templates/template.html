@@ -145,6 +145,15 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <div class="dropdown-container">
+                    <label for="tutor_types">Tutor Types:</label>
+                    <select id="tutor_types" name="tutor_types" multiple>
+                        {% for type in tutor_types %}
+                            <option value="{{ type }}" {% if type in selected_tutor_types %}selected{% endif %}>{{ type }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 
                 <div class="dropdown-container">
                   <label for="lessons_per_relation">Min accepted lessons per relation:</label>
