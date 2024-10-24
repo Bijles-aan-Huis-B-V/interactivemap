@@ -53,7 +53,10 @@
         .map-container {
             width: 80%;             /* Set the width of the map container */
             height: 600px;          /* Set the height of the map container */
-            margin: 15px auto;      /* Center the map container */
+            margin-top: 15px;      /* Center the map container */
+            margin-left: 5px;
+            margin-bottom: 15px;
+            margin-right: 15px;
             border: 5px solid #04e; /* Optional: Add border to map container */
             overflow: hidden;       /* Prevent overflow from the container */
             position: relative;      /* Position relative for child absolute positioning */
@@ -77,6 +80,46 @@
         }
         table.data th {
             background-color: #f2f2f2;
+        }
+        .colored-box {
+            width: 400px;
+            padding: 5px;
+            margin-top: 15px;
+            margin-left: 5px;
+            border: 1px solid #ccc;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+
+        .line {
+            margin: 5px 0;
+        }
+
+        .dot {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .red-text {
+            color: red;
+        }
+
+        .green-text {
+            color: green;
+        }
+
+        .blue-text {
+            color: blue;
+        }
+
+        .orange-text {
+            color: orange;
+        }
+        .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px; /* Space between the two sections */
         }
     </style>
 </head>
@@ -178,10 +221,30 @@
     {% if df_html %}
     <!-- Map Container -->
     <h1> Map visualization</h1>
+    <div class="container">
+    <div class="colored-box">
+    <div class="line">
+        <span class="dot blue-text">●</span>
+        <span class="blue-text">Tutor has < 5.0 lessons per relation.</span>
+    </div>
+    <div class="line">
+        <span class="dot red-text">●</span>
+        <span class="red-text">Tutor has >= 5.0, and in bottom 25% lessons per relation.</span>
+    </div>
+    <div class="line">
+        <span class="dot orange-text">●</span>
+        <span class="orange-text">Tutor has >= 5.0, and in 25%-75% lessons per relation.</span>
+    </div>
+    <div class="line">
+        <span class="dot green-text">●</span>
+        <span class="green-text">Tutor has >= 5.0, and in top 75% lessons per relation.</span>
+    </div>
+    </div>
     <div class="map-container">
         <div id="map">
             {{ map_html|safe }}
         </div>
+    </div>
     </div>
     {% endif %}
 
