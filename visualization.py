@@ -110,8 +110,8 @@ def index():
             
             end_date = request.form.get('end_date')
             
-            selected_exluded = request.form.getlist('excluded')
-            selected_exluded = [exclude.lower() == 'true' for exclude in selected_exluded]
+            selected_excluded = request.form.getlist('excluded')
+            selected_excluded = [exclude.lower() == 'true' for exclude in selected_excluded]
             
             if lessons_per_relation:
               try:
@@ -183,11 +183,11 @@ def index():
                   temp_df = filtered_df[pd.notna(filtered_df['lessons_per_relation'])]
                   filtered_df = temp_df[temp_df['lessons_per_relation'] >= lessons_per_relation]
                   
-            if selected_exluded:
-                if '-Empty-' in selected_exluded:
-                    filtered_df = filtered_df[filtered_df['tutor_category'].isnull() | filtered_df['tutor_category'].isin(selected_exluded)]
+            if selected_excluded:
+                if '-Empty-' in selected_excluded:
+                    filtered_df = filtered_df[filtered_df['excluded_from_search'].isnull() | filtered_df['excluded_from_search'].isin(selected_excluded)]
                 else:
-                    filtered_df = filtered_df[filtered_df['tutor_category'].isin(selected_exluded)]
+                    filtered_df = filtered_df[filtered_df['excluded_from_search'].isin(selected_excluded)]
                     
             if start_date:
                 filtered_df = filtered_df[filtered_df['recent_lesson'] >= start_date]
@@ -248,7 +248,7 @@ def index():
             else:
                 map_html = "<p>No tutors available for the selected filters.</p>"
                 
-            Tutor_filtered = Tutor_filtered[['tutor','created_at', 'state', 'country', 'city', 'tutor_category', 'max_travel_distance', 'number_of_relations', 'lessons_per_relation', 'recent_lesson']]
+            Tutor_filtered = Tutor_filtered[['tutor','created_at', 'state', 'country', 'city', 'tutor_category', 'max_travel_distance', 'number_of_relations', 'lessons_per_relation', 'recent_lesson', 'excluded_from_search']]
             Tutor_filtered['created_at'] = Tutor_filtered['created_at'].str[:10]
             df_html = Tutor_filtered.to_html(classes='data', index=False, escape=False)
 
@@ -259,18 +259,18 @@ def index():
                            school_levels=school_levels, 
                            school_years=school_years, 
                            school_types=school_types, 
-                           course_names=course_names, 
+                           course_names=course_names,
+                           excluded = excluded,
                            selected_school_levels=selected_school_levels,
                            selected_school_years=selected_school_years,
                            selected_school_types=selected_school_types,
                            selected_course_names=selected_course_names,
                            selected_availabilities=selected_availabilities,
+                           selected_excluded = selected_excluded,
                            lessons_per_relation = lessons_per_relation,
                            no_lesson_tutor = no_lesson_tutor,
                            tutor_types = tutor_types,
                            selected_tutor_types = selected_tutor_types,
-                           excluded = excluded,
-                           selected_excluded = selected_excluded,
                            start_date = start_date,
                            end_date = end_date,
                            map_html=map_html,

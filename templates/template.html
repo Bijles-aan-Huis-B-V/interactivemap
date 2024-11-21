@@ -292,10 +292,10 @@
                         <div class="checkbox-container">
                             <label>Excluded from search:</label>
                             <div>
-                                {% for excl in excluded %}
+                                {% for ex in excluded %}
                                     <label>
-                                        <input type="checkbox" name="excluded" value="{{ excl }}" {% if excl in selected_excluded %}checked{% endif %}>
-                                        {{ excl }}
+                                        <input type="checkbox" name="excluded" value="{{ ex }}" {% if ex in selected_excluded %}checked{% endif %}>
+                                        {{ ex }}
                                     </label>
                                 {% endfor %}
                             </div>
@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 matchingCircle.setStyle({
                     color: 'purple',
                     fillColor: 'purple',
-                    fillOpacity: 0.9
+                    fillOpacity: 0.5
                 });
             } else {
                 console.log("No matching circle found for marker.");
@@ -405,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function () {
             circle.setStyle({
                 color: 'purple',
                 fillColor: 'purple',
-                fillOpacity: 0.8,
+                fillOpacity: 0.5,
             });
 
             // Highlight the corresponding marker
