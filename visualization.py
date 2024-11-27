@@ -222,7 +222,8 @@ def index():
                           Per relation: {row['lessons_per_relation']} lesson(s)<br><br>
                           Link: <a href="{ 'https://bijlesaanhuis.nl/profiel/' if row['country'] == 'nl' else 'https://lernigo.de/profil/' }{row['tutor']}" target="_blank">Profile</a>
                           </div>""",                        
-                        color=row['quantile_labels'],
+                        #Color
+                        #color=row['quantile_labels'],
                         fill = True,
                         fill_opacity = 0,
                     ).add_to(tutors_map)
