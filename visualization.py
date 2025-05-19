@@ -221,20 +221,18 @@ def index():
 
             if end_date:
                 filtered_df = filtered_df[filtered_df['recent_lesson'] <= end_date]
-  
+ 
             if (
                 use_location_filter == "Yes"
                 and latitude_input is not None
                 and longitude_input is not None
                 and distance_km is not None
-
-    ):
-        filtered_df["distance_to_point"] = filtered_df.apply(
-            lambda row: haversine(latitude_input, longitude_input, row["latitude"], row["longitude"]),
-            axis=1
-        )
-        filtered_df = filtered_df[filtered_df["distance_to_point"] <= distance_km]
-
+            ):
+                filtered_df["distance_to_point"] = filtered_df.apply(  # INDENT THIS LINE
+                    lambda row: haversine(latitude_input, longitude_input, row["latitude"], row["longitude"]),
+                    axis=1
+                )
+                filtered_df = filtered_df[filtered_df["distance_to_point"] <= distance_km]
         
       # Filter tutors based on the final filters
             tutor_numbers = filtered_df['tutor']
