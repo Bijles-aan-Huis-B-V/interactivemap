@@ -28,6 +28,19 @@ def categorize(value):
         return 'green'
     else:
         return 'yellow'
+        
+from math import radians, cos, sin, asin, sqrt
+
+def haversine(lat1, lon1, lat2, lon2):
+    # Convert degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    # Haversine formula
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * asin(sqrt(a))
+    r = 6371  # Radius of Earth in kilometers
+    return c * r
 
 # Load the datasets
 Courses = pd.read_csv('Courses.csv')
@@ -109,6 +122,19 @@ def index():
             start_date = request.form.get('start_date')
             
             end_date = request.form.get('end_date')
+
+                    use_location_filter = request.form.get('use_location_filter')
+        latitude_input = request.form.get('latitude_input')
+        longitude_input = request.form.get('longitude_input')
+        distance_km = request.form.get('distance_km')
+
+        try:
+            latitude_input = float(latitude_input) if latitude_input else None
+            longitude_input = float(longitude_input) if longitude_input else None
+            distance_km = float(distance_km) if distance_km else None
+        except ValueError:
+            latitude_input = longitude_input = distance_km = None
+
             
             selected_excluded = request.form.getlist('excluded')
             selected_excluded = [exclude.lower() == 'true' for exclude in selected_excluded]
@@ -195,7 +221,18 @@ def index():
             if end_date:
                 filtered_df = filtered_df[filtered_df['recent_lesson'] <= end_date]
 
-            
+            if (
+            use_location_filter == "Yes"
+            and latitude_input is not None
+            and longitude_input is not None
+            and distance_km is not None
+        ):
+            filtered_df["distance_to_point"] = filtered_df.apply(
+                lambda row: haversine(latitude_input, longitude_input, row["latitude"], row["longitude"]),
+                axis=1
+            )
+            filtered_df = filtered_df[filtered_df["distance_to_point"] <= distance_km]
+        
       # Filter tutors based on the final filters
             tutor_numbers = filtered_df['tutor']
             Tutor_filtered = Tutor[Tutor['tutor'].isin(tutor_numbers)]
@@ -275,7 +312,12 @@ def index():
                            start_date = start_date,
                            end_date = end_date,
                            map_html=map_html,
-                           df_html=df_html)
+                           df_html=df_html),
+                           use_location_filter=use_location_filter,
+    latitude_input=latitude_input,
+    longitude_input=longitude_input,
+    distance_km=distance_km
+
 
 if __name__ == '__main__':
     app.run(debug=True)
