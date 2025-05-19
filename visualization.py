@@ -123,10 +123,11 @@ def index():
             
             end_date = request.form.get('end_date')
 
-                    use_location_filter = request.form.get('use_location_filter')
-        latitude_input = request.form.get('latitude_input')
-        longitude_input = request.form.get('longitude_input')
-        distance_km = request.form.get('distance_km')
+            use_location_filter = request.form.get('use_location_filter')
+            latitude_input = request.form.get('latitude_input')
+            longitude_input = request.form.get('longitude_input')
+            distance_km = request.form.get('distance_km')
+
 
         try:
             latitude_input = float(latitude_input) if latitude_input else None
