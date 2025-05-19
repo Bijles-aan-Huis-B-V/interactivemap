@@ -30,8 +30,8 @@ def categorize(value):
         return 'yellow'
 
 # Load the datasets
-Courses = pd.read_csv('Courses.csv')
-Tutor = pd.read_csv('Tutor.csv')
+Tutor = pd.read_csv('Tutor.csv', sep=';')
+Courses = pd.read_csv('Courses.csv', sep=';')
 
 #Calculate relations percentile
 Quantiles = Tutor[Tutor['lessons_per_relation'] >= 5.0]
