@@ -326,7 +326,32 @@
                                 </label>
                             </div>
                         </div>
+<!-- START LOCATION FILTERS -->
+<div class="checkbox-container">
+    <label>Filter by distance from coordinates?</label>
+    <div>
+        <label>
+            <input type="checkbox" name="use_location_filter" value="Yes" {% if use_location_filter == 'Yes' %}checked{% endif %}>
+            Yes
+        </label>
+    </div>
+</div>
 
+<div class="input-container">
+    <label for="latitude_input">Latitude:</label>
+    <input id="latitude_input" name="latitude_input" type="text" value="{{ latitude_input or '' }}">
+</div>
+
+<div class="input-container">
+    <label for="longitude_input">Longitude:</label>
+    <input id="longitude_input" name="longitude_input" type="text" value="{{ longitude_input or '' }}">
+</div>
+
+<div class="input-container">
+    <label for="distance_km">Max Distance (km):</label>
+    <input id="distance_km" name="distance_km" type="number" step="any" value="{{ distance_km or '' }}">
+</div>
+<!-- END LOCATION FILTERS -->
                         <button type="submit" class="submit-button">Apply Filters</button>
                     </div>
                 </fieldset>
