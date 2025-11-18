@@ -123,7 +123,7 @@ def load_data() -> None:
         x["mtime_epoch"] for x in (tutor_info, courses_info)
         if x.get("mtime_epoch") is not None
     ]
-    latest_epoch = min(mtimes) if mtimes else None
+    latest_epoch = max(mtimes) if mtimes else None   # most recent mtime
     latest_iso = (
         datetime.fromtimestamp(latest_epoch).isoformat(timespec="seconds")
         if latest_epoch is not None
@@ -220,10 +220,12 @@ def load_data() -> None:
             if stype:  a["types"].add(str(stype))
             try:
                 if syear not in (None, ""): a["years"].add(float(syear))
-            except Exception: pass
+            except Exception:
+                pass
             try:
                 if tcat  not in (None, ""): a["types_num"].add(float(tcat))
-            except Exception: pass
+            except Exception:
+                pass
             if avail not in (None, ""):
                 a["availability"].add(str(avail).strip().lower() in ("true","1","yes","y"))
 
@@ -463,7 +465,7 @@ INDEX_HTML = '''<!doctype html>
               <label>Max Distance (km)</label>
               <input id="refMaxKm" type="number" step="0.1" min="0" max="500" placeholder="e.g., 10" />
             </div>
-            <button id="geoBtn" class="btn secondary" title="Use your device location">Use my location</button>
+            <button id="geoBtn" class="btn secondary" title="Use my location">Use my location</button>
           </div>
           <div class="hint">Geolocation works on http://localhost and https://</div>
         </fieldset>
@@ -1001,8 +1003,12 @@ def index() -> Response:
     return Response(INDEX_HTML, mimetype="text/html")
 
 # --------------------------------
+# Eager-load data on import
+# --------------------------------
+load_data()
+
+# --------------------------------
 # Main
 # --------------------------------
 if __name__ == "__main__":
-    load_data()
     app.run(debug=True, host="127.0.0.1", port=5000)
