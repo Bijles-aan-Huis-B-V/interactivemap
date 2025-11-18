@@ -24,16 +24,25 @@ app = Flask(__name__)
 # In-memory dataset
 TUTORS: List[Dict[str, Any]] = []
 
+# File metadata (paths + last modified times)
+FILE_META: Dict[str, Any] = {}
+
 # --------------------------------
 # Helpers
 # --------------------------------
 def csv_path(default_name: str, env_var: str) -> str:
+    # 1) explicit env var wins
     p = os.getenv(env_var)
     if p and os.path.exists(p):
         return p
-    local = os.path.join(os.getcwd(), default_name)
+
+    # 2) file next to this script
+    here = os.path.dirname(os.path.abspath(__file__))
+    local = os.path.join(here, default_name)
     if os.path.exists(local):
         return local
+
+    # 3) Jupyter/hosted env fallback
     return os.path.join("/mnt/data", default_name)
 
 def norm_key(s: str) -> str:
@@ -72,11 +81,30 @@ COUNTRY_BOUNDS: Dict[str, Tuple[float,float,float,float]] = {
     "Germany":     (47.270, 5.866, 55.058, 15.043),
 }
 
+def file_info(path: str) -> Dict[str, Any]:
+    """Return path and mtime info for a file."""
+    try:
+        if os.path.exists(path):
+            ts = os.path.getmtime(path)
+            dt = datetime.fromtimestamp(ts)
+            return {
+                "path": path,
+                "mtime_epoch": ts,
+                "mtime_iso": dt.isoformat(timespec="seconds"),
+            }
+    except Exception:
+        pass
+    return {
+        "path": path,
+        "mtime_epoch": None,
+        "mtime_iso": None,
+    }
+
 # --------------------------------
 # Data loader (schema auto-detect with aliases)
 # --------------------------------
 def load_data() -> None:
-    global TUTORS
+    global TUTORS, FILE_META, COUNTRY_BOUNDS
 
     tutor_csv   = csv_path("Tutor.csv",   "TUTOR_CSV")
     courses_csv = csv_path("Courses.csv", "COURSES_CSV")
@@ -87,6 +115,30 @@ def load_data() -> None:
     print(f"Tutor CSV exists: {os.path.exists(tutor_csv)}")
     print(f"Courses CSV exists: {os.path.exists(courses_csv)}")
     print("=============================")
+
+    # --- file metadata / data freshness ---
+    tutor_info   = file_info(tutor_csv)
+    courses_info = file_info(courses_csv)
+    mtimes = [
+        x["mtime_epoch"] for x in (tutor_info, courses_info)
+        if x.get("mtime_epoch") is not None
+    ]
+    latest_epoch = min(mtimes) if mtimes else None
+    latest_iso = (
+        datetime.fromtimestamp(latest_epoch).isoformat(timespec="seconds")
+        if latest_epoch is not None
+        else None
+    )
+
+    FILE_META = {
+        "tutor_csv": tutor_info,
+        "courses_csv": courses_info,
+        "data_last_updated": {
+            "mtime_epoch": latest_epoch,
+            "mtime_iso": latest_iso,
+        },
+    }
+    # --- end file metadata setup ---
 
     tutors_tmp: Dict[str, Dict[str, Any]] = {}
 
@@ -216,7 +268,6 @@ def load_data() -> None:
                 except Exception as e:
                     print(f"[warn] skipping tutor row due to error: {e}")
 
-    global COUNTRY_BOUNDS
     COUNTRY_BOUNDS = {
         "Netherlands": (50.750, 3.360, 53.600, 7.227),
         "Germany":     (47.270, 5.866, 55.058, 15.043),
@@ -275,6 +326,13 @@ def diagnostics() -> Response:
         "sample": TUTORS[:3],
     })
 
+@app.get("/api/meta")
+def api_meta() -> Response:
+    """Return file metadata and overall last-updated timestamp."""
+    return jsonify({
+        "file_meta": FILE_META,
+    })
+
 # --------------------------------
 # Frontend (HTML+JS)
 # --------------------------------
@@ -310,9 +368,10 @@ INDEX_HTML = '''<!doctype html>
     <div id="app">
       <div id="sidebar">
         <h2>📍 Tutors Map</h2>
+        <div id="dataInfo" class="hint" style="margin-bottom:8px;"></div>
 
         <fieldset>
-          <legend>Country (one)</legend>
+          <legend>Country (pick one)</legend>
           <div id="countryBox" class="radio-grid"></div>
         </fieldset>
 
@@ -359,12 +418,10 @@ INDEX_HTML = '''<!doctype html>
             <div>
               <label>Tutor Types (multi)</label>
               <div id="tutorTypesBox" class="checkbox-grid"></div>
-              <div class="hint">1 = Junior, 2 = Senior, 3 = Supreme</div>
             </div>
             <div>
               <label>Min lessons per relation</label>
               <input id="minLPR" type="number" step="0.1" min="0" max="50" placeholder="e.g., 4.5" />
-              <div class="hint">0.0–50.0</div>
             </div>
           </div>
         </fieldset>
@@ -469,6 +526,36 @@ INDEX_HTML = '''<!doctype html>
       const setLog = msg => { console.log('[MAP]', msg); byId('log').textContent = String(msg); };
       const parseFloatOrNull = s => (s === '' || s == null ? null : Number(s));
 
+      function formatIsoToLocal(iso) {
+        if (!iso) return 'unknown';
+        const d = new Date(iso);
+        if (isNaN(d)) return iso;
+        return d.toLocaleString(undefined, {
+          year:  'numeric',
+          month: 'short',
+          day:   '2-digit',
+          hour:  '2-digit',
+          minute:'2-digit',
+        });
+      }
+
+      function renderDataInfo(meta) {
+        const el = byId('dataInfo');
+        if (!el || !meta) return;
+
+        const tutor = meta.tutor_csv || {};
+        const courses = meta.courses_csv || {};
+        const last = (meta.data_last_updated || {}).mtime_iso;
+
+        const tutorTime   = formatIsoToLocal(tutor.mtime_iso);
+        const coursesTime = formatIsoToLocal(courses.mtime_iso);
+        const lastTime    = formatIsoToLocal(last);
+
+        el.innerHTML = `
+          <div><span class="badge">Last updated: ${lastTime}</span></div>
+        `;
+      }
+
       // UI builders
       function radioHtml(name, values, selectedValue, labelsMap = null, includeAny = false) {
         const parts = [];
@@ -517,29 +604,29 @@ INDEX_HTML = '''<!doctype html>
         const avail = new Set();
         const ttypes = new Set();
 
-      sub.forEach(t => {
-        (t.school_levels || []).forEach(x => levels.add(x));
-        (t.school_types || []).forEach(x => types.add(x));
-        (t.courses || []).forEach(x => courses.add(x));
-        (t.school_years || []).forEach(y => {
-        if (isFinite(Number(y))) years.add(Number(y));
+        sub.forEach(t => {
+          (t.school_levels || []).forEach(x => levels.add(x));
+          (t.school_types || []).forEach(x => types.add(x));
+          (t.courses || []).forEach(x => courses.add(x));
+          (t.school_years || []).forEach(y => {
+            if (isFinite(Number(y))) years.add(Number(y));
+          });
+          (t.tutor_types || []).forEach(x => {
+            const n = Number(x);
+            if (isFinite(n)) ttypes.add(n);
+          });
+          avail.add(Boolean(t.available_for_new_students));
         });
-        (t.tutor_types || []).forEach(x => {
-          const n = Number(x);
-        if (isFinite(n)) ttypes.add(n);
-        });
-        avail.add(Boolean(t.available_for_new_students));
-      });
 
-      return {
-        levels: Array.from(levels).sort(),
-        types: Array.from(types).sort(),
-        courses: Array.from(courses).sort(),
-        years: Array.from(years).sort((a, b) => a - b),
-        availability: avail, // Set{true,false}
-        tutor_types: ttypes, // Set{1,2,3,...}
-      };
-}
+        return {
+          levels: Array.from(levels).sort(),
+          types: Array.from(types).sort(),
+          courses: Array.from(courses).sort(),
+          years: Array.from(years).sort((a, b) => a - b),
+          availability: avail, // Set{true,false}
+          tutor_types: ttypes, // Set{1,2,3,...}
+        };
+      }
 
       // Collect current filters
       function collectFilters() {
@@ -762,7 +849,7 @@ INDEX_HTML = '''<!doctype html>
             ).openPopup();
           });
 
-        markers.push(marker);
+          markers.push(marker);
         });
 
         if (markers.length) {
@@ -822,12 +909,14 @@ INDEX_HTML = '''<!doctype html>
 
       // Boot & events
       async function loadAll() {
-        const [tRes, fRes] = await Promise.all([
-          fetch('/api/tutors', {cache:'no-store'}),
-          fetch('/api/filters', {cache:'no-store'})
+        const [tRes, fRes, mRes] = await Promise.all([
+          fetch('/api/tutors',  {cache:'no-store'}),
+          fetch('/api/filters', {cache:'no-store'}),
+          fetch('/api/meta',    {cache:'no-store'}),
         ]);
         const t = await tRes.json();
         const f = await fRes.json();
+        const m = await mRes.json();
         ALL = Array.isArray(t.items) ? t.items : [];
 
         buildCountryRadios(f.countries || []);
@@ -839,6 +928,9 @@ INDEX_HTML = '''<!doctype html>
             byId('yearMax').value = Math.max(...yrs);
           }
         }
+
+        // Render data freshness / file mtimes
+        renderDataInfo(m.file_meta);
 
         rebuildDynamicOptions();
         setLog(`Loaded ${ALL.length} tutors.`);
