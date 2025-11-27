@@ -5,6 +5,7 @@ Tutors Map — dynamic filters, date pickers, field hints, and geolocation
 - Country: radio (single, no "Any"); auto-selects first country on load/reset
 - Levels / Types / Courses: checkboxes (multi) with live narrowing
 - Availability: checkboxes (multi: True/False). Selecting none or both = Any (CamelCase labels)
+- Excluded from search: checkboxes (multi: True/False). Selecting none or both = Any
 - Relations: radio — "Include tutors with no relations?" with only Yes / No (no "Any" option shown)
 - Date pickers: native <input type="date"> with hint text (inclusive range)
 - Numeric fields: min/max and helper text; legends show ranges
@@ -256,8 +257,12 @@ def load_data() -> None:
                         "school_levels":  sorted(list(agg.get(tid, {}).get("levels", set()))),
                         "school_years":   sorted(list(agg.get(tid, {}).get("years", set()))),
                         "school_types":   sorted(list(agg.get(tid, {}).get("types", set()))),
-                        "available_for_new_students": (str(row.get(COL_AVAILABLE) or "").strip().lower() in ("true","1","yes","y")) if COL_AVAILABLE else (True in agg.get(tid, {}).get("availability", {True})),
-                        "excluded_from_search": (str(row.get(COL_EXCLUDED) or "").strip().lower() in ("true","1","yes","y")) if COL_EXCLUDED else False,
+                        "available_for_new_students": (
+                            str(row.get(COL_AVAILABLE) or "").strip().lower() in ("true","1","yes","y")
+                        ) if COL_AVAILABLE else (True in agg.get(tid, {}).get("availability", {True})),
+                        "excluded_from_search": (
+                            str(row.get(COL_EXCLUDED) or "").strip().lower() in ("true","1","yes","y")
+                        ) if COL_EXCLUDED else False,
                         "tutor_types":     sorted(list(agg.get(tid, {}).get("types_num", set()))),
                         "min_accepted_lessons_per_relation": float(row.get(COL_MINREL) or 0.0) if COL_MINREL else 0.0,
                         "total_lessons":   int(float(row.get(COL_TOTAL) or 0)) if COL_TOTAL else 0,
@@ -355,7 +360,7 @@ INDEX_HTML = '''<!doctype html>
       label { font-size:13px; }
       .hint { font-size: 11px; color:#6b7280; margin-top:4px; }
       .row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
-      .row.onecol { grid-template-columns: 1fr; } /* << make one-per-line for specific groups */
+      .row.onecol { grid-template-columns: 1fr; }
       .radio-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; }
       .checkbox-grid { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:6px; }
       .btn { padding: 10px 12px; border-radius: 8px; background: #2563eb; color:#fff; border:none; cursor:pointer; }
@@ -414,8 +419,12 @@ INDEX_HTML = '''<!doctype html>
         </fieldset>
 
         <fieldset>
+          <legend>Excluded from search (Select True and/or False. Selecting none or both = Any)</legend>
+          <div id="excludedBox" class="checkbox-grid"></div>
+        </fieldset>
+
+        <fieldset>
           <legend>Tutor metadata</legend>
-          <!-- One line per field (stacked vertically) -->
           <div class="row onecol">
             <div>
               <label>Tutor Types (multi)</label>
@@ -490,7 +499,7 @@ INDEX_HTML = '''<!doctype html>
         2: 'Senior',
         3: 'Supreme',
       };
-      const TUTOR_TYPE_VALUES = [1, 2, 3]; 
+      const TUTOR_TYPE_VALUES = [1, 2, 3];
 
       // --- Map & layers
       const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -549,8 +558,6 @@ INDEX_HTML = '''<!doctype html>
         const courses = meta.courses_csv || {};
         const last = (meta.data_last_updated || {}).mtime_iso;
 
-        const tutorTime   = formatIsoToLocal(tutor.mtime_iso);
-        const coursesTime = formatIsoToLocal(courses.mtime_iso);
         const lastTime    = formatIsoToLocal(last);
 
         el.innerHTML = `
@@ -563,7 +570,9 @@ INDEX_HTML = '''<!doctype html>
         const parts = [];
         if (includeAny) {
           const anyId = name + '_any';
-          parts.push(`<label><input type="radio" name="${name}" value="" id="${anyId}" ${selectedValue===''?'checked':''}/> Any</label>`);
+          parts.push(
+            `<label><input type="radio" name="${name}" value="" id="${anyId}" ${selectedValue===''?'checked':''}/> Any</label>`
+          );
         }
         values.forEach(v => {
           const id = name + '_' + btoa(unescape(encodeURIComponent(String(v)))).replace(/=/g,'');
@@ -625,24 +634,28 @@ INDEX_HTML = '''<!doctype html>
           types: Array.from(types).sort(),
           courses: Array.from(courses).sort(),
           years: Array.from(years).sort((a, b) => a - b),
-          availability: avail, // Set{true,false}
-          tutor_types: ttypes, // Set{1,2,3,...}
+          availability: avail,
+          tutor_types: ttypes,
         };
       }
 
       // Collect current filters
       function collectFilters() {
-        const country    = getCountry();                // radio
-        const levels     = getChecked('levels');        // multi
-        const types      = getChecked('types');         // multi
-        const courses    = getChecked('courses');       // multi
+        const country    = getCountry();
+        const levels     = getChecked('levels');
+        const types      = getChecked('types');
+        const courses    = getChecked('courses');
 
         // Availability: multiselect 'True'/'False' labels; none or both = Any
-        const availVals  = new Set(getChecked('available')); // 'True'/'False'
+        const availVals  = new Set(getChecked('available'));
         const availSet   = new Set(Array.from(availVals).map(v => v === 'True'));
 
+        // Excluded from search: multiselect 'True'/'False'; none or both = Any
+        const exclVals   = new Set(getChecked('excluded'));
+        const excludedSet = new Set(Array.from(exclVals).map(v => v === 'True'));
+
         // Relations: radio yes/no (no Any in UI). If nothing picked, treat as Any.
-        const relChoice  = getRadioValue('noRel'); // 'yes' or 'no' or ''
+        const relChoice  = getRadioValue('noRel');
 
         const tutorTypes = getChecked('tutorType')
           .map(v => Number(v))
@@ -658,7 +671,7 @@ INDEX_HTML = '''<!doctype html>
         const refMaxKm   = parseFloatOrNull(byId('refMaxKm').value);
         return {
           country, levels, types, courses,
-          availSet, relChoice,
+          availSet, excludedSet, relChoice,
           tutorTypes, minLPR,
           yearMin, yearMax, dateFrom, dateTo,
           refLat, refLon, refMaxKm
@@ -673,6 +686,12 @@ INDEX_HTML = '''<!doctype html>
         if (f.availSet && f.availSet.size === 1) {
           const want = Array.from(f.availSet)[0];
           if (Boolean(t.available_for_new_students) !== want) return false;
+        }
+
+        // Excluded-from-search filter:
+        if (f.excludedSet && f.excludedSet.size === 1) {
+          const wantExcl = Array.from(f.excludedSet)[0];
+          if (Boolean(t.excluded_from_search) !== wantExcl) return false;
         }
 
         // Tutor types (multi) & min lessons
@@ -721,7 +740,7 @@ INDEX_HTML = '''<!doctype html>
           }
         }
 
-        // Relations filter (include tutors with no relations?) — apply only if user picked Yes/No
+        // Relations filter
         if (f.relChoice) {
           const hasNone = Number(t.relations_count || 0) === 0;
           if (f.relChoice === 'yes' && !hasNone) return false;
@@ -745,22 +764,18 @@ INDEX_HTML = '''<!doctype html>
       // Subset helpers for narrowing
       function subsetRespectingAll(f) { return ALL.filter(t => matchesTutor(t, f)); }
       function subsetIgnoringAvailability(f) {
-        // For availability meta, ignore availability selection entirely
         const g = { ...f, availSet: new Set() };
         return ALL.filter(t => matchesTutor(t, g));
       }
-
-      // Subset ignoring tutorTypes (for building tutor-type options)
       function subsetIgnoringTutorTypes(f) {
-        const g = { ...f, tutorTypes: [] };  // empty array ⇒ no tutorTypes filter
+        const g = { ...f, tutorTypes: [] };
         return ALL.filter(t => matchesTutor(t, g));
       }
 
-      // Rebuild dynamic option groups (checkboxes + availability checkboxes + relations radio)
+      // Rebuild dynamic option groups
       function rebuildDynamicOptions() {
         const f = collectFilters();
 
-        // 1) Checkbox lists respect all current filters (so Courses shrink as Levels/Types change)
         const subAll = subsetRespectingAll(f);
         const metaAll = metaFromSubset(subAll);
 
@@ -772,19 +787,17 @@ INDEX_HTML = '''<!doctype html>
         byId('typesBox').innerHTML   = checkboxGroupHtml('types',   metaAll.types,   selTypes);
         byId('coursesBox').innerHTML = checkboxGroupHtml('courses', metaAll.courses, selCourses);
 
-        // Tutor Types: 1=Junior, 2=Senior, 3=Supreme
+        // Tutor Types
         const subNoTT = subsetIgnoringTutorTypes(f);
         const metaNoTT = metaFromSubset(subNoTT);
-        const presentTT = metaNoTT.tutor_types; // Set of available tutor types after other filters
+        const presentTT = metaNoTT.tutor_types;
 
         const selTutorTypes = new Set(
           (f.tutorTypes || []).filter(v => TUTOR_TYPE_VALUES.includes(v))
         );
-
         const disabledTutor = new Set(
           TUTOR_TYPE_VALUES.filter(v => !presentTT.has(v))
         );
-
         byId('tutorTypesBox').innerHTML = checkboxGroupHtml(
           'tutorType',
           TUTOR_TYPE_VALUES,
@@ -793,21 +806,42 @@ INDEX_HTML = '''<!doctype html>
           TUTOR_TYPE_LABELS
         );
 
-        // 2) Availability checkboxes (True / False) with CamelCase labels; disable ones not present
+        // Availability checkboxes
         const subNoAvail = subsetIgnoringAvailability(f);
         const metaNoAvail = metaFromSubset(subNoAvail);
-        const presentSet = metaNoAvail.availability; // Set {true/false}
-        const selAvailVals = new Set(getChecked('available'));  // 'True'/'False'
+        const presentSet = metaNoAvail.availability;
+        const selAvailVals = new Set(getChecked('available'));
         const options = ['True','False'];
         const disabled = new Set();
         if (!presentSet.has(true))  disabled.add('True');
         if (!presentSet.has(false)) disabled.add('False');
+        byId('availBox').innerHTML = checkboxGroupHtml(
+          'available',
+          options,
+          selAvailVals,
+          disabled,
+          {True:'True', False:'False'}
+        );
 
-        byId('availBox').innerHTML = checkboxGroupHtml('available', options, selAvailVals, disabled, {True:'True', False:'False'});
+        // Excluded-from-search checkboxes (always both enabled)
+        const selExcludedVals = new Set(getChecked('excluded'));
+        byId('excludedBox').innerHTML = checkboxGroupHtml(
+          'excluded',
+          ['True','False'],
+          selExcludedVals,
+          new Set(),
+          {True:'True', False:'False'}
+        );
 
-        // 3) Relations radio (Yes / No only) — no "Any" option shown
-        const current = getRadioValue('noRel'); // may be ''
-        byId('relBox').innerHTML = radioHtml('noRel', ['yes','no'], current, {yes:'Yes', no:'No'}, false);
+        // Relations radio
+        const currentRel = getRadioValue('noRel');
+        byId('relBox').innerHTML = radioHtml(
+          'noRel',
+          ['yes','no'],
+          currentRel,
+          {yes:'Yes', no:'No'},
+          false
+        );
       }
 
       // Render markers
@@ -827,29 +861,46 @@ INDEX_HTML = '''<!doctype html>
             ...DEFAULT_CIRCLE_STYLE
           }).addTo(layerGroup);
 
-          marker.on('click', () => {
-            if (currentHighlight && currentHighlight.setStyle) currentHighlight.setStyle(DEFAULT_CIRCLE_STYLE);
+          const courses = Array.isArray(t.courses) ? t.courses.join(', ') : '';
+
+          let profileURL = '';
+          if (t.profile_url && t.profile_url.trim() !== '') {
+            profileURL = t.profile_url.trim();
+          } else if (t.country === 'Netherlands' || t.country === 'NL' || t.country === 'nl') {
+            profileURL = `https://bijlesaanhuis.nl/profiel/${t.id}`;
+          } else if (t.country === 'Germany' || t.country === 'DE' || t.country === 'de') {
+            profileURL = `https://lernigo.de/profil/${t.id}`;
+          }
+
+          const profile = profileURL
+            ? `<div><a class="btnlink" href="${profileURL}" target="_blank" rel="noopener">Open profile ↗</a></div>`
+            : '';
+
+          const popupHtml = `
+            <div style="font-size:12px;line-height:1.2;">
+              <div><b>${t.name || t.id}</b></div>
+              <div><b>Country:</b> ${t.country || ''}</div>
+              <div><b>Courses:</b> ${courses}</div>
+              <div><b>Max travel:</b> ${t.max_distance_km ?? '—'} km</div>
+              <div><b>Available:</b> ${t.available_for_new_students ? 'True' : 'False'}</div>
+              <div><b>Excluded:</b> ${t.excluded_from_search ? 'True' : 'False'}</div>
+              <div><b>Total lessons:</b> ${t.total_lessons ?? '—'}</div>
+              <div><b>Per relation:</b> ${t.min_accepted_lessons_per_relation ?? '—'} lesson(s)</div>
+              ${profile}
+            </div>`;
+          marker.bindPopup(popupHtml);
+
+          const openAndHighlight = () => {
+            if (currentHighlight && currentHighlight.setStyle) {
+              currentHighlight.setStyle(DEFAULT_CIRCLE_STYLE);
+            }
             circle.setStyle(HIGHLIGHT_STYLE);
             currentHighlight = circle;
+            marker.openPopup();
+          };
 
-            const courses = Array.isArray(t.courses) ? t.courses.join(', ') : '';
-            const profile = (t.profile_url && t.profile_url.trim() !== '') ?
-              `<div><a class="btnlink" href="${t.profile_url}" target="_blank" rel="noopener">Open profile ↗</a></div>` : '';
-
-            marker.bindPopup(
-              `<div style="font-size:12px;line-height:1.2;">
-                <div><b>${t.name || t.id}</b></div>
-                <div><b>Country:</b> ${t.country || ''}</div>
-                <div><b>Courses:</b> ${courses}</div>
-                <div><b>Max travel:</b> ${t.max_distance_km ?? '—'} km</div>
-                <div><b>Available:</b> ${t.available_for_new_students ? 'True' : 'False'}</div>
-                <div><b>Excluded:</b> ${t.excluded_from_search ? 'True' : 'False'}</div>
-                <div><b>Total lessons:</b> ${t.total_lessons ?? '—'}</div>
-                <div><b>Per relation:</b> ${t.min_accepted_lessons_per_relation ?? '—'} lesson(s)</div>
-                ${profile}
-              </div>`
-            ).openPopup();
-          });
+          marker.on('click', openAndHighlight);
+          circle.on('click', openAndHighlight);
 
           markers.push(marker);
         });
@@ -861,7 +912,15 @@ INDEX_HTML = '''<!doctype html>
         setLog(`Plotted ${markers.length} markers.`);
       }
 
-      // Build Country radios (single, no Any)
+      // Clear highlight
+      map.on('click', () => {
+        if (currentHighlight && currentHighlight.setStyle) {
+          currentHighlight.setStyle(DEFAULT_CIRCLE_STYLE);
+          currentHighlight = null;
+        }
+      });
+
+      // Country radios
       function buildCountryRadios(countries) {
         ALL_COUNTRIES = countries.slice();
         const current = getRadioValue('country');
@@ -869,7 +928,7 @@ INDEX_HTML = '''<!doctype html>
         byId('countryBox').innerHTML = radioCountryHtml(countries, initial);
       }
 
-      // --- My location pin management ---
+      // My location pin
       function updateMyLocationPin({zoom=false} = {}) {
         myLocationLayer.clearLayers();
         const lat = parseFloat(byId('refLat').value);
@@ -893,7 +952,6 @@ INDEX_HTML = '''<!doctype html>
             const { latitude, longitude } = pos.coords;
             byId('refLat').value = latitude.toFixed(6);
             byId('refLon').value = longitude.toFixed(6);
-            // Do NOT auto-fill max distance (as requested)
             updateMyLocationPin({zoom:true});
             setLog('Filled coordinates from your location.');
           },
@@ -902,7 +960,6 @@ INDEX_HTML = '''<!doctype html>
         );
       });
 
-      // Also update the green pin when user manually types coordinates
       ['refLat','refLon'].forEach(id => {
         byId(id).addEventListener('change', () => updateMyLocationPin({zoom:false}));
         byId(id).addEventListener('blur',   () => updateMyLocationPin({zoom:false}));
@@ -931,14 +988,12 @@ INDEX_HTML = '''<!doctype html>
           }
         }
 
-        // Render data freshness / file mtimes
         renderDataInfo(m.file_meta);
 
         rebuildDynamicOptions();
         setLog(`Loaded ${ALL.length} tutors.`);
       }
 
-      // Re-narrow options whenever any relevant input changes (live)
       document.getElementById('sidebar').addEventListener('change', () => {
         rebuildDynamicOptions();
       });
@@ -948,7 +1003,6 @@ INDEX_HTML = '''<!doctype html>
         const filtered = ALL.filter(t => matchesTutor(t, f));
         if (f.country && boundsByCountry[f.country]) map.fitBounds(boundsByCountry[f.country]);
         render(filtered);
-        // Ensure my location pin stays visible
         updateMyLocationPin({zoom:false});
       });
 
@@ -983,15 +1037,19 @@ INDEX_HTML = '''<!doctype html>
           layerGroup.clearLayers();
           currentHighlight = null;
           const marker = L.marker([t.lat, t.lon]).addTo(layerGroup);
-          const circle = L.circle([t.lat, t.lon], { radius: Math.max(0, Number(t.max_distance_km||0))*1000, color:'#e11d48', weight:2, fillOpacity:0.2 }).addTo(layerGroup);
-          marker.bindPopup(`<b>Outlier:</b> ${t.name || t.id}<br/><b>Reason:</b> ${t._reason || ''}<br/>lat=${t.lat}, lon=${t.lon}`).openPopup();
+          const circle = L.circle(
+            [t.lat, t.lon],
+            { radius: Math.max(0, Number(t.max_distance_km||0))*1000, color:'#e11d48', weight:2, fillOpacity:0.2 }
+          ).addTo(layerGroup);
+          marker.bindPopup(
+            `<b>Outlier:</b> ${t.name || t.id}<br/><b>Reason:</b> ${t._reason || ''}<br/>lat=${t.lat}, lon=${t.lon}`
+          ).openPopup();
           setLog(`Outliers: ${data.count}. Centered on first (${t.id}).`);
         } catch (e) {
           setLog('Failed to fetch outliers.');
         }
       });
 
-      // Boot
       loadAll();
     </script>
   </body>
