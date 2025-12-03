@@ -511,8 +511,8 @@ INDEX_HTML = '''<!doctype html>
 
       // Highlight control
       let currentHighlight = null;
-      const DEFAULT_CIRCLE_STYLE = { color: '#2563eb', weight: 1, fillOpacity: 0.1 };
-      const HIGHLIGHT_STYLE      = { color: '#1e40af', weight: 2, fillOpacity: 0.2 };
+      const DEFAULT_CIRCLE_STYLE = { color: '#2563eb', weight: 1, fillOpacity: 0.0 };
+      const HIGHLIGHT_STYLE      = { color: '#1e40af', weight: 2, fillOpacity: 0.25 };
 
       // My location icon (green)
       const greenIcon = new L.Icon({
